@@ -1,0 +1,1 @@
+export MEMEX_DATA=/home/SharedFolder/MemexQA
