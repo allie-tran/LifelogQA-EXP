@@ -49,11 +49,11 @@ def strip_tags(html):
 # for each token with "-" or others, remove it and split the token
 def process_tokens(tokens):
     newtokens = []
-    l = ("-","/", "~", '"', "'", ":","\)","\(","\[","\]","\{","\}")
+    l = ("-", "/", "~", '"', "'", ":", "\)", "\(", "\[", "\]", "\{", "\}")
     for token in tokens:
         # split then add multiple to new tokens
-        newtokens.extend([one for one in re.split("[%s]"%("").join(l),token) if one != ""])
-        return newtokens
+        newtokens.extend([one for one in re.split("[%s]" % ("").join(l), token) if one != ""])
+    return newtokens
 
 def l2norm(feat):
     l2_norm = np.linalg.norm(feat,2)
@@ -187,9 +187,13 @@ def prepro_each(args,data_type,question_ids,start_ratio=0.0,end_ratio=1.0):
         # treat description as one sentence
         #print('Album Desc', album['album_description'])
         temp['description'] = word_tokenize(strip_tags(album['album_description']))
-        #print('Here  ',temp['description'])
-        if(temp['description']):
-            temp['description_c'] = [[*tok] for tok in temp['description']]
+
+
+        temp['description_c'] = [[*tok] for tok in temp['description']]
+
+        #print(album['album_description'])
+        #print(temp['description'])
+
 
         # use _ to connect?
         if album['album_where'] is None:
@@ -204,8 +208,7 @@ def prepro_each(args,data_type,question_ids,start_ratio=0.0,end_ratio=1.0):
         # photo info
         temp['photo_titles'] = [word_tokenize(title) for title in album['photo_titles']]
         for title in temp['photo_titles']:
-            if(title):
-                temp['photo_titles_c'] = [[*tok] for tok in title]
+            temp['photo_titles_c'] = [[*tok] for tok in title]
 
         temp['photo_ids'] = [str(pid) for pid in album['photo_ids']]
         assert len(temp['photo_ids']) == len(temp['photo_titles'])
@@ -214,23 +217,8 @@ def prepro_each(args,data_type,question_ids,start_ratio=0.0,end_ratio=1.0):
             if pid not in pid2feat.keys():
                 pid2feat[pid] = args.images[pid]
 
-        concat_meta = []
-        if(temp['title']):
-            concat_meta += temp['title']
-        if(temp['description']):
-            concat_meta += temp['description']
-        if(temp['where']):
-            concat_meta += temp['where']
-        if(temp['when']):
-            concat_meta += temp['when']
 
-        for title in temp['photo_titles']:
-            if(title):
-                for tok in title:
-                    if(tok):
-                        concat_meta += tok
-
-        for t in concat_meta:
+        for t in temp['title'] + temp['description'] + temp['where'] + temp['when'] + [tok for title in temp['photo_titles'] for tok in title ]:
             #print(t)
             word_counter[t.lower()] += used
             for c in t:
@@ -259,7 +247,7 @@ def prepro_each(args,data_type,question_ids,start_ratio=0.0,end_ratio=1.0):
         "charCounter":char_counter,
         "word2vec":word2vec_dict,}
 
-    print(shared)
+    #print(shared)
 
     #print(word_counter)
     print("data:%s, char entry:%s, word entry:%s, word2vec entry:%s,album: %s/%s, image_feat:%s"%(data_type,len(char_counter),len(word_counter),len(word2vec_dict),len(album_info),len(albums),len(pid2feat)))
