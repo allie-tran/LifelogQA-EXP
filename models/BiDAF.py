@@ -1,9 +1,9 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from utils.nn import LSTM, Linear
-import config
+import sys
 
+sys.path.append('../')
+from config import *
+import torch.nn as nn
+from utils.nn import LSTM, Linear
 
 
 class BiDAF(nn.Module):
@@ -82,5 +82,6 @@ class BiDAF(nn.Module):
 
     def forward(self, batch):
         print('Forward')
+
         def char_emb_layer(x):
             batch_size = x.size(0)
