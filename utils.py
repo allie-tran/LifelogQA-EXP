@@ -2,10 +2,14 @@
 import os
 import torch
 import torch.nn as nn
+from itertools import zip_longest
+import random, itertools
+from collections import defaultdict
+
 
 def mkdir(path):
-	if not os.path.exists(path):
-		os.makedirs(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 class LSTM(nn.Module):
@@ -74,10 +78,6 @@ class Linear(nn.Module):
         return x
 
 
-
-
-
-
 class Dataset():
     def __init__(self, data, datatype, shared=None, valid_idxs=None):
         self.data = data
@@ -96,4 +96,3 @@ class Dataset():
             out[key].extend(val[idx] for idx in idxs)  # extend with one whole list
         # so we get a batch_size of data : {"q":[] -> len() == batch_size}
         return out
-
