@@ -1,19 +1,21 @@
-import sys,os,argparse
-#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # so here won't have poll allocator info
+import sys, os, argparse
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # so here won't have poll allocator info
 import _pickle as pickle
 import numpy as np
-import math,time,json
+import math, time, json
 import torch
 from tqdm import tqdm
 
 import config
+from utils import Dataset
 
 
 def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-get_model = None # the model we will use, based on parameter in the get_args()
+
+get_model = None  # the model we will use, based on parameter in the get_args()
 
 
 # def get_args():
@@ -34,18 +36,19 @@ get_model = None # the model we will use, based on parameter in the get_args()
 #     return parser.parse_args()
 
 
-def read_data(datatype,loadExistModelShared=False):
+def read_data(datatype, loadExistModelShared=False):
     data_path = os.path.join(config.paths['out_path'], "%s_data.p" % datatype)
     shared_path = os.path.join(config.paths['out_path'], "%s_shared.p" % datatype)
 
     with open(data_path, "rb")as f:
         data = pickle.load(f, encoding='latin1')
     with open(shared_path, "rb") as f:
-        shared = pickle.load(f, encoding='latin1')  # this will be added later with word id, either new or load from exists
+        shared = pickle.load(f,
+                             encoding='latin1')  # this will be added later with word id, either new or load from exists
 
     num_examples = len(data['q'])
     valid_idxs = range(num_examples)
-    print("loaded %s/%s data points for %s" % (len(valid_idxs),num_examples,datatype))
+    print("loaded %s/%s data points for %s" % (len(valid_idxs), num_examples, datatype))
 
     model_shared_path = os.path.join(config.paths['shared_path'], "shared.p")
     if (loadExistModelShared):
@@ -55,8 +58,10 @@ def read_data(datatype,loadExistModelShared=False):
             shared[key] = model_shared[key]
     else:
         shared['word2idx'] = {word: idx + 2 for idx, word in enumerate(
-            [word for word, count in shared['wordCounter'].items() if (count > config.threshold['word_count_thres']) and word not in shared['word2vec']])}
-        shared['char2idx'] = {char: idx + 2 for idx, char in enumerate([char for char, count in shared['charCounter'].items() if count > config.threshold['char_count_thres']])}
+            [word for word, count in shared['wordCounter'].items() if
+             (count > config.threshold['word_count_thres']) and word not in shared['word2vec']])}
+        shared['char2idx'] = {char: idx + 2 for idx, char in enumerate(
+            [char for char, count in shared['charCounter'].items() if count > config.threshold['char_count_thres']])}
 
         NULL = "<NULL>"
         UNK = "<UNK>"
@@ -67,21 +72,15 @@ def read_data(datatype,loadExistModelShared=False):
 
         pickle.dump({"word2idx": shared['word2idx'], 'char2idx': shared['char2idx']}, open(model_shared_path, "wb"))
 
-    shared['existing_word2idx'] = {word: idx for idx, word in enumerate([word for word in sorted(shared['word2vec'].keys()) if word not in shared['word2idx']])}
+    shared['existing_word2idx'] = {word: idx for idx, word in enumerate(
+        [word for word in sorted(shared['word2vec'].keys()) if word not in shared['word2idx']])}
     idx2vec = {idx: shared['word2vec'][word] for word, idx in shared['existing_word2idx'].items()}
     shared['existing_emb_mat'] = np.array([idx2vec[idx] for idx in range(len(idx2vec))], dtype="float32")
 
-    #assert config.feature_dim['image_feat_dim'] == shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0], ("image dim is not %s, it is %s" % (config.feature_dim['image_feat_dim'], shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0]))
-
-    return datatype
-
-    #return Dataset(data, datatype, shared=shared, valid_idxs=valid_idxs)
+    # assert config.feature_dim['image_feat_dim'] == shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0], ("image dim is not %s, it is %s" % (config.feature_dim['image_feat_dim'], shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0]))
+    return Dataset(data, datatype, shared=shared, valid_idxs=valid_idxs)
 
 
 if __name__ == '__main__':
-    #config = get_args()
-    read_data(datatype='train',loadExistModelShared=False)
-
-
-
-
+    # config = get_args()
+    read_data(datatype='train', loadExistModelShared=False)
