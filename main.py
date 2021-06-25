@@ -5,9 +5,11 @@ import numpy as np
 import math, time, json
 import torch
 from tqdm import tqdm
-
-import config
+from torch import optim, nn
+from config import *
 from utils import Dataset
+from models.BiDAF import BiDAF,EMA
+
 
 
 def mkdir(path):
@@ -79,6 +81,48 @@ def read_data(datatype, loadExistModelShared=False):
 
     # assert config.feature_dim['image_feat_dim'] == shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0], ("image dim is not %s, it is %s" % (config.feature_dim['image_feat_dim'], shared['pid2feat'][shared['pid2feat'].keys()[0]].shape[0]))
     return Dataset(data, datatype, shared=shared, valid_idxs=valid_idxs)
+
+
+def train():
+    train_data = read_data('train', load)
+    val_data = read_data('val', True)
+
+    print('data loading complete')
+    print(train_data)
+
+    word2vec_dict = train_data.shared['word2vec']
+    word2idx_dict = train_data.shared['word2idx']
+
+    print(train_data.num_examples)
+    print(val_data.num_examples)
+
+    # we are not fine tuning , so this should be empty
+    idx2vec_dict = {word2idx_dict[word]: vec for word, vec in word2vec_dict.items() if word in word2idx_dict}
+
+    params.word_emb_size = len(next(iter(train_data.shared['word2vec'].values())))
+    # the size of word vocab not in existing glove
+    params.word_vocab_size = len(train_data.shared['word2idx'])
+
+    # random initial embedding matrix for new words
+    params.emb_mat = np.array([idx2vec_dict[idx] if idx2vec_dict.has_key(idx) else np.random.multivariate_normal(
+        np.zeros(params.word_emb_size), np.eye(params.word_emb_size)) for idx in range(params.word_vocab_size)],
+                              dtype="float32")
+
+    device = torch.device(f"cuda:{params.gpu}" if torch.cuda.is_available() else "cpu")
+    model = BiDAF(params).to(device)
+
+    ema = EMA(params.exp_decay_rate)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            ema.register(name, param.data)
+    parameters = filter(lambda p: p.requires_grad, model.parameters())
+
+    optimizer = optim.Adadelta(parameters, lr=params.learning_rate)
+    criterion = nn.CrossEntropyLoss()
+
+    model.train()
+    loss, last_epoch = 0, -1
+    max_dev_exact, max_dev_f1 = -1, -1
 
 
 if __name__ == '__main__':
