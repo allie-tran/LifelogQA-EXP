@@ -17,13 +17,13 @@ params = {
     'sent_des_size_thres': 10,
     'sent_album_title_size_thres': 8,
     'sent_photo_title_size_thres': 8,
-    'sent_when_size_thres': 4,
-    'sent_where_size_thres': 4,
-    'answer_size_thres': 5,
+    'sent_when_size_thres': 6,
+    'sent_where_size_thres': 6,
+    'answer_size_thres': 6,
     'question_size_thres': 25,
     'word_size_thres': 16,
 
-    'hidden_size': 50,
+    'hidden_size': 100,
     'batch_size': 6,
 
     'char_emb_size': 100,
