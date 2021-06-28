@@ -4,8 +4,11 @@ import torch
 import torch.nn as nn
 from utils import LSTM, Linear, populate_tensors
 import torch.nn.functional as F
+import torchtext
 
 sys.path.append('../')
+
+glove = torchtext.vocab.GloVe(name="6B", dim=100, max_vectors=50000)
 
 
 def get_char(char, batch):
@@ -55,7 +58,8 @@ class BiDAF(nn.Module):
                               dtype=torch.int32)
         self.at_c = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size'], self.W),
                                 dtype=torch.int32)
-        self.at = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']), dtype=torch.bool)
+        self.at_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']),
+                                   dtype=torch.bool)
 
         # album description
         # [N,M,JD]
@@ -105,9 +109,6 @@ class BiDAF(nn.Module):
         # 4 choice classification
         self.y = torch.zeros((self.N, self.num_choice), dtype=torch.bool)
 
-        # feed in the pretrain word vectors for all batch
-        self.existing_emb_mat = torch.zeros((self.VW, params['word_emb_size']), dtype=torch.float)
-
         # feed in the image feature for this batch
         # [photoNumForThisBatch,image_dim]
         # self.image_emb_mat = tf.placeholder("float", [None, config.image_feat_dim], name="image_emb_mat")
@@ -125,7 +126,9 @@ class BiDAF(nn.Module):
 
         # 2. Word Embedding Layer
         # initialize word embedding with GloVe
-        # self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
+        # feed in the pretrain word vectors for all batch
+        # self.existing_emb_mat = torch.zeros((self.VW, params['word_emb_size']), dtype=torch.float64)
+        self.glove_emb = nn.Embedding.from_pretrained(glove.vectors, freeze=True)
 
         # highway network
         # assert self.args.hidden_size * 2 == (self.args.char_channel_size + self.args.word_dim)
@@ -146,6 +149,7 @@ class BiDAF(nn.Module):
             :return: (batch, seq_len, char_channel_size)
             """
             batch_size = x.size(0)
+
             # (batch, seq_len, word_len, char_dim)
             x = self.dropout(self.char_emb(x))
             # (batch， seq_len, char_dim, word_len)
@@ -160,17 +164,52 @@ class BiDAF(nn.Module):
             x = x.view(batch_size, -1, params['char_channel_size'])
             return x
 
+        def highway_network(x1, x2):
+            x = torch.cat([x1, x2], dim=-1)
+            for i in range(2):
+                h = getattr(self, 'highway_linear{}'.format(i))(x)
+                g = getattr(self, 'highway_gate{}'.format(i))(x)
+                x = g * h + (1 - g) * x
+                return x
+
         populate_tensors(self, batch)
-        xat = char_emb_layer(self.at_c)
-        xad = char_emb_layer(self.ad_c)
-        xwhen = char_emb_layer(self.when_c)
-        xwhere = char_emb_layer(self.where_c)
-        xpts = char_emb_layer(self.pts_c)
-        qq = char_emb_layer(self.q_c)
-        qchoices = char_emb_layer(self.choices_c)
 
-        #word embedding
+        xat = char_emb_layer(self.at_c.reshape(self.N, -1, params['max_word_size']))
+        xad = char_emb_layer(self.ad_c.reshape(self.N, -1, params['max_word_size']))
+        xwhen = char_emb_layer(self.when_c.reshape(self.N, -1, params['max_word_size']))
+        xwhere = char_emb_layer(self.where_c.reshape(self.N, -1, params['max_word_size']))
+        xpts = char_emb_layer(self.pts_c.reshape(self.N, -1, params['max_word_size']))
+        qq = char_emb_layer(self.q_c.reshape(self.N, -1, params['max_word_size']))
+        qchoices = char_emb_layer(self.choices_c.reshape(self.N, -1, params['max_word_size']))
+
+        # word embedding
+        w_at = self.glove_emb(self.at)
+        w_ad = self.glove_emb(self.ad)
+        w_when = self.glove_emb(self.when)
+        w_where = self.glove_emb(self.where)
+        w_pts = self.glove_emb(self.pts)
+        w_q = self.glove_emb(self.q)
+        w_choices = self.glove_emb(self.choices)
+
+        # Reshape word embeddings
+
+        w_at = w_at.reshape(self.N, -1, self.wd)
+        w_ad = w_ad.reshape(self.N, -1, self.wd)
+        w_when = w_when.reshape(self.N, -1, self.wd)
+        w_where = w_where.reshape(self.N, -1, self.wd)
+        w_pts = w_pts.reshape(self.N, -1, self.wd)
+        w_q = w_q.reshape(self.N, -1, self.wd)
+        w_choices = w_choices.reshape(self.N, -1, self.wd)
+
+        # highway network
+        h_at = highway_network(xat, w_at)
+        h_ad = highway_network(xad, w_ad)
+        h_when = highway_network(xwhen, w_when)
+        h_where = highway_network(xwhere, w_where)
+        h_pts = highway_network(xpts, w_pts)
+        h_qq = highway_network(qq, w_q)
+        h_choices = highway_network(qchoices, w_choices)
+        return h_at, w_at
 
 
-        return xat
 
