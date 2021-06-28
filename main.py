@@ -1,4 +1,5 @@
 import sys, os, argparse
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # so here won't have poll allocator info
 import _pickle as pickle
 import numpy as np
@@ -7,9 +8,8 @@ import torch
 from tqdm import tqdm
 from torch import optim, nn
 from config import *
-from utils import Dataset
-from models.BiDAF import BiDAF,EMA
-
+from utils import Dataset, update_params
+from models.BiDAF import BiDAF, EMA
 
 
 def mkdir(path):
@@ -39,8 +39,8 @@ get_model = None  # the model we will use, based on parameter in the get_args()
 
 
 def read_data(datatype, loadExistModelShared=False):
-    data_path = os.path.join(config.paths['out_path'], "%s_data.p" % datatype)
-    shared_path = os.path.join(config.paths['out_path'], "%s_shared.p" % datatype)
+    data_path = os.path.join(paths['out_path'], "%s_data.p" % datatype)
+    shared_path = os.path.join(paths['out_path'], "%s_shared.p" % datatype)
 
     with open(data_path, "rb")as f:
         data = pickle.load(f, encoding='latin1')
@@ -52,8 +52,8 @@ def read_data(datatype, loadExistModelShared=False):
     valid_idxs = range(num_examples)
     print("loaded %s/%s data points for %s" % (len(valid_idxs), num_examples, datatype))
 
-    model_shared_path = os.path.join(config.paths['shared_path'], "shared.p")
-    if (loadExistModelShared):
+    model_shared_path = os.path.join(paths['shared_path'], "shared.p")
+    if loadExistModelShared:
         with open(model_shared_path, "rb") as f:
             model_shared = pickle.load(f)
         for key in model_shared:
@@ -61,9 +61,9 @@ def read_data(datatype, loadExistModelShared=False):
     else:
         shared['word2idx'] = {word: idx + 2 for idx, word in enumerate(
             [word for word, count in shared['wordCounter'].items() if
-             (count > config.threshold['word_count_thres']) and word not in shared['word2vec']])}
+             (count > params['word_count_thres']) and word not in shared['word2vec']])}
         shared['char2idx'] = {char: idx + 2 for idx, char in enumerate(
-            [char for char, count in shared['charCounter'].items() if count > config.threshold['char_count_thres']])}
+            [char for char, count in shared['charCounter'].items() if count > params['char_count_thres']])}
 
         NULL = "<NULL>"
         UNK = "<UNK>"
@@ -84,11 +84,10 @@ def read_data(datatype, loadExistModelShared=False):
 
 
 def train():
-    train_data = read_data('train', load)
+    train_data = read_data('train')
     val_data = read_data('val', True)
 
     print('data loading complete')
-    print(train_data)
 
     word2vec_dict = train_data.shared['word2vec']
     word2idx_dict = train_data.shared['word2idx']
@@ -99,32 +98,51 @@ def train():
     # we are not fine tuning , so this should be empty
     idx2vec_dict = {word2idx_dict[word]: vec for word, vec in word2vec_dict.items() if word in word2idx_dict}
 
-    params.word_emb_size = len(next(iter(train_data.shared['word2vec'].values())))
+    params['word_emb_size'] = len(next(iter(train_data.shared['word2vec'].values())))
     # the size of word vocab not in existing glove
-    params.word_vocab_size = len(train_data.shared['word2idx'])
+    params['word_vocab_size'] = len(train_data.shared['word2idx'])
 
     # random initial embedding matrix for new words
-    params.emb_mat = np.array([idx2vec_dict[idx] if idx2vec_dict.has_key(idx) else np.random.multivariate_normal(
-        np.zeros(params.word_emb_size), np.eye(params.word_emb_size)) for idx in range(params.word_vocab_size)],
+    params['emb_mat'] = np.array([idx2vec_dict[idx] if idx in idx2vec_dict else np.random.multivariate_normal(
+        np.zeros(params['word_emb_size']), np.eye(params['word_emb_size'])) for idx in range(params['word_vocab_size'])],
                               dtype="float32")
 
-    device = torch.device(f"cuda:{params.gpu}" if torch.cuda.is_available() else "cpu")
-    model = BiDAF(params).to(device)
+    print(params['word_emb_size'])
+    print(params['word_vocab_size'])
 
-    ema = EMA(params.exp_decay_rate)
+    device = torch.device(f"cuda:{params.gpu}" if torch.cuda.is_available() else "cpu")
+    update_params([train_data, val_data])
+    model = BiDAF().to(device)
+    ema = EMA(params['exp_decay_rate'])
     for name, param in model.named_parameters():
         if param.requires_grad:
             ema.register(name, param.data)
     parameters = filter(lambda p: p.requires_grad, model.parameters())
 
-    optimizer = optim.Adadelta(parameters, lr=params.learning_rate)
+    optimizer = optim.Adadelta(parameters, lr=params['learning_rate'])
     criterion = nn.CrossEntropyLoss()
 
     model.train()
     loss, last_epoch = 0, -1
     max_dev_exact, max_dev_f1 = -1, -1
 
+    num_steps = int(math.ceil(train_data.num_examples/float(params['batch_size']))) * params['num_epochs']
+
+    for batch in tqdm(train_data.get_batches(params['batch_size'], num_steps=num_steps), total=num_steps):
+        batchIdx, batchDs = batch
+        out_c, out_w = model(batchDs)
+        print(out_c.size())
+        print(out_w.size())
+        break
+        # show each data point
+        #print("keys:%s" % batchDs.data.keys())
+        #print(batchDs.data['q'])
+        #print(batchDs.data['y'])
+        #for key in sorted(batchDs.data.()):
+        #    print("\t%s:%s" % (key, batchDs.data[key]))
+
 
 if __name__ == '__main__':
     # config = get_args()
-    read_data(datatype='train', loadExistModelShared=False)
+    #read_data(datatype='train', loadExistModelShared=False)
+    train()
