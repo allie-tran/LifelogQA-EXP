@@ -166,6 +166,7 @@ class Dataset():
 
             batch_data['pidx2feat'] = image_feats
 
+
             shared_batch_data = defaultdict(list)
 
             # all the shared data need for this mini batch
@@ -227,9 +228,9 @@ def update_params(datasets, showMeta=False):
     params['max_sent_album_title_size'] = 0  # max sentence word count for album title
     params['max_sent_photo_title_size'] = 0
     params['max_sent_des_size'] = 0
-    params['max_when_size'] = 0
-    params['max_where_size'] = 0
-    params['max_answer_size'] = 0
+    params['max_when_size'] = 6
+    params['max_where_size'] = 6
+    params['max_answer_size'] = 6
     params['max_question_size'] = 0
     params['max_word_size'] = 0  # word letter count
 
@@ -371,7 +372,7 @@ def populate_tensors(self, batch):
         Y = batch.data['y']
         Y_c = batch.data['cy']
 
-        correctIndex = np.random.choice(self.num_choice, batch.data.size())
+        correctIndex = np.random.choice(self.num_choice, params['batch_size'])
         for i in range(len(batch.data['y'])):
             self.y[i, correctIndex[i]] = True
             assert len(C[i]) == (self.num_choice - 1)
@@ -407,7 +408,7 @@ def populate_tensors(self, batch):
                 # each word
                 if k == params['max_sent_album_title_size']:
                     break
-                wordIdx = get_word(atijk)
+                wordIdx = get_word(atijk, batch)
                 self.at[i, j, k] = wordIdx
                 self.at_mask[i, j, k] = True
 
@@ -592,6 +593,10 @@ def populate_tensors(self, batch):
                 if k == params['max_word_size']:
                     break
                 self.q_c[i, j, k] = get_char(cqijk, batch)
+
+    self.image_emb_mat = batch.data['pidx2feat']
+    #self.existing_emb_mat = torch.tensor(batch.shared['existing_emb_mat'], device='cuda')
+    self.existing_emb_mat = torch.from_numpy(batch.shared['existing_emb_mat'])
 
 
 
