@@ -142,6 +142,21 @@ class BiDAF(nn.Module):
                                   nn.Sigmoid()))
         self.dropout = nn.Dropout(p=params['dropout'])
 
+        # BiDirectional LSTM
+        self.context_LSTM = nn.LSTM(input_size=params['hidden_size'] * 2,
+                                    hidden_size=params['hidden_size'],
+                                    num_layers=2,
+                                    bidirectional=True,
+                                    batch_first=True,
+                                    dropout=params['dropout'])
+
+        self.image_encoder = nn.LSTM(input_size=params['image_feat_dim'],
+                                     hidden_size=params['hidden_size'],
+                                     num_layers=2,
+                                     bidirectional=True,
+                                     batch_first=True,
+                                     dropout=params['dropout'])
+
     def forward(self, batch):
         def char_emb_layer(x):
             """
@@ -174,6 +189,7 @@ class BiDAF(nn.Module):
 
         populate_tensors(self, batch)
 
+        # Char Embeddings
         xat = char_emb_layer(self.at_c.reshape(self.N, -1, params['max_word_size']))
         xad = char_emb_layer(self.ad_c.reshape(self.N, -1, params['max_word_size']))
         xwhen = char_emb_layer(self.when_c.reshape(self.N, -1, params['max_word_size']))
@@ -182,7 +198,7 @@ class BiDAF(nn.Module):
         qq = char_emb_layer(self.q_c.reshape(self.N, -1, params['max_word_size']))
         qchoices = char_emb_layer(self.choices_c.reshape(self.N, -1, params['max_word_size']))
 
-        # word embedding
+        # Word Embeddings
         w_at = self.glove_emb(self.at)
         w_ad = self.glove_emb(self.ad)
         w_when = self.glove_emb(self.when)
@@ -192,7 +208,6 @@ class BiDAF(nn.Module):
         w_choices = self.glove_emb(self.choices)
 
         # Reshape word embeddings
-
         w_at = w_at.reshape(self.N, -1, self.wd)
         w_ad = w_ad.reshape(self.N, -1, self.wd)
         w_when = w_when.reshape(self.N, -1, self.wd)
@@ -201,15 +216,30 @@ class BiDAF(nn.Module):
         w_q = w_q.reshape(self.N, -1, self.wd)
         w_choices = w_choices.reshape(self.N, -1, self.wd)
 
-        # highway network
-        h_at = highway_network(xat, w_at)
-        h_ad = highway_network(xad, w_ad)
-        h_when = highway_network(xwhen, w_when)
-        h_where = highway_network(xwhere, w_where)
-        h_pts = highway_network(xpts, w_pts)
-        h_qq = highway_network(qq, w_q)
-        h_choices = highway_network(qchoices, w_choices)
-        return h_at, w_at
+        # Highway Network
+        h_at = highway_network(xat, w_at)  # Shape (Batch Size, 32, 200) (char_dim + word_dim = 200)
+        h_ad = highway_network(xad, w_ad)  # Shape (Batch Size, 40, 200)
+        h_when = highway_network(xwhen, w_when)  # Shape (Batch Size, 24, 200)
+        h_where = highway_network(xwhere, w_where)  # Shape (Batch Size, 24, 200)
+        h_pts = highway_network(xpts, w_pts)  # Shape (Batch Size, 256, 200)
+        h_qq = highway_network(qq, w_q)  # Shape (Batch Size, 23, 200)
+        h_choices = highway_network(qchoices, w_choices)  # Shape (Batch Size, 24, 200)
 
+        # Image Features
+        image_feat = nn.Embedding(self.image_emb_mat.shape[0], self.image_emb_mat.shape[1])
+        image_feat.weight.data.copy_(torch.from_numpy(self.image_emb_mat))
+        image2feat = image_feat(self.pis)
 
+        # Bidirectional LSTMs
+        qq_out, qq_out_states = self.context_LSTM(h_qq)  # Questions
+        at_out, at_out_states = self.context_LSTM(h_at)  # Album Title
+        ad_out, ad_out_states = self.context_LSTM(h_ad)  # Album Description
+        when_out, when_out_states = self.context_LSTM(h_when)  # When
+        where_out, where_out_states = self.context_LSTM(h_where)  # Where
+        pts_out, pts_out_states = self.context_LSTM(h_pts)  # Photo Titles
+        choice_out, choices_out_states = self.context_LSTM(h_choices)  # Choices
 
+        images_out, images_out_states = self.image_encoder(image2feat.reshape(params['batch_size'], -1,
+                                                                              params['image_feat_dim']))
+
+        return images_out, qq_out_states[1]
