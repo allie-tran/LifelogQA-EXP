@@ -2,7 +2,7 @@
 params = {
     'load': False,
     'is_train': True,
-    'image_feat_dim': 3048,
+    'image_feat_dim': 2537,
 
     'gpu': 'gpu0',
     'learning_rate': 0.01,
