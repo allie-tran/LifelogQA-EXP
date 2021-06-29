@@ -166,7 +166,6 @@ class Dataset():
 
             batch_data['pidx2feat'] = image_feats
 
-
             shared_batch_data = defaultdict(list)
 
             # all the shared data need for this mini batch
