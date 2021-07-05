@@ -157,8 +157,9 @@ class Dataset():
                             pid2idx[pid] = len(pid2idx.keys())  # start from zero
 
             # fill in the image feature
-            image_feats = np.zeros((len(pid2idx), self.shared['pid2feat'][list(self.shared['pid2feat'].keys())[0]].shape[0]),
-                                   dtype="float32")
+            image_feats = np.zeros(
+                (len(pid2idx), self.shared['pid2feat'][list(self.shared['pid2feat'].keys())[0]].shape[0]),
+                dtype="float32")
 
             # here image_matrix idx-> feat, will replace the pid in each instance to this idx
             for pid in pid2idx:  # fill each idx with feature, -> pid
@@ -348,6 +349,63 @@ def get_word(word, batch):
 
 
 def populate_tensors(self, batch):
+    # album title
+    # [N,M,JXA]
+    self.at = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']),
+                          dtype=torch.int32)
+    self.at_c = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size'], self.W),
+                            dtype=torch.int32)
+    self.at_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']),
+                               dtype=torch.bool)
+
+    # album description
+    # [N,M,JD]
+    self.ad = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.int32)
+    self.ad_c = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size'], self.W),
+                            dtype=torch.int32)
+    self.ad_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.bool)
+
+    # album when, where
+    # [N,M,JT/JG]
+    self.when = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.int32)
+    self.when_c = torch.zeros((self.N, params['max_num_albums'], params['max_when_size'], self.W),
+                              dtype=torch.int32)
+    self.when_mask = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.bool)
+
+    self.where = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.int32)
+    self.where_c = torch.zeros((self.N, params['max_num_albums'], params['max_where_size'], self.W),
+                               dtype=torch.int32)
+    self.where_mask = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.bool)
+
+    # photo titles
+    # [N,M,JI,JXP]
+    self.pts = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
+                            params['max_sent_photo_title_size']), dtype=torch.int32)
+    self.pts_c = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
+                              params['max_sent_photo_title_size'], self.W), dtype=torch.int32)
+    self.pts_mask = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
+                                 params['max_sent_photo_title_size']), dtype=torch.bool)
+
+    # photo
+    # [N,M,JI] # each is a photo index
+    self.pis = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.int32)
+    self.pis_mask = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.bool)
+
+    # question
+    # [N,JQ]
+    self.q = torch.zeros((self.N, params['max_question_size']), dtype=torch.int32)
+    self.q_c = torch.zeros((self.N, params['max_question_size'], self.W), dtype=torch.int32)
+    self.q_mask = torch.zeros((self.N, params['max_question_size']), dtype=torch.bool)
+
+    # answer + choice words
+    # [N,4,JA]
+    self.choices = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.int32)
+    self.choices_c = torch.zeros((self.N, self.num_choice, params['max_answer_size'], self.W), dtype=torch.int32)
+    self.choices_mask = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.bool)
+
+    # 4 choice classification
+    self.y = torch.zeros((self.N, self.num_choice), dtype=torch.bool)
+
     # question and choices
     Q = batch.data['q']
     Q_c = batch.data['cq']
@@ -366,6 +424,8 @@ def populate_tensors(self, batch):
     PT = batch.data['photo_titles']
     PT_c = batch.data['photo_titles_c']
     PI = batch.data['photo_idxs']
+
+    print('Inside Populate', PI)
 
     if params['is_train']:
         Y = batch.data['y']
@@ -393,6 +453,7 @@ def populate_tensors(self, batch):
                     break
                 # print pijk
                 assert isinstance(pijk, int)
+                print('Val', i, j, k, '-', pijk)
                 self.pis[i, j, k] = pijk
                 self.pis_mask[i, j, k] = True
 
@@ -594,14 +655,16 @@ def populate_tensors(self, batch):
                 self.q_c[i, j, k] = get_char(cqijk, batch)
 
     self.image_emb_mat = batch.data['pidx2feat']
-    #self.existing_emb_mat = torch.tensor(batch.shared['existing_emb_mat'], device='cuda')
+    # self.existing_emb_mat = torch.tensor(batch.shared['existing_emb_mat'], device='cuda')
     self.existing_emb_mat = torch.from_numpy(batch.shared['existing_emb_mat'])
 
 
-
-
-
-
-
-
-
+def get_eval_score(pred, gt):
+    assert len(pred) == len(gt)
+    assert len(pred) > 0
+    total = len(pred)
+    correct = 0
+    for qid in pred.keys():
+        if pred[qid] == gt[qid]:
+            correct += 1
+    return correct / float(total)
