@@ -8,7 +8,7 @@ params = {
     'learning_rate': 0.01,
     'exp_decay_rate': 0.999,
     'dropout': 0.2,
-    'num_epochs': 5,
+    'num_epochs': 2,
     'hidden_size': 100,
     'batch_size': 6,
 
