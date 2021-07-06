@@ -10,6 +10,7 @@ from torch import optim, nn
 from config import *
 from utils import Dataset, update_params
 from models.BiDAF import BiDAF, EMA
+from utils import get_eval_score, getAnswers
 
 
 def mkdir(path):
@@ -92,9 +93,6 @@ def train():
     word2vec_dict = train_data.shared['word2vec']
     word2idx_dict = train_data.shared['word2idx']
 
-    print(train_data.num_examples)
-    print(val_data.num_examples)
-
     # we are not fine tuning , so this should be empty
     idx2vec_dict = {word2idx_dict[word]: vec for word, vec in word2vec_dict.items() if word in word2idx_dict}
 
@@ -106,10 +104,6 @@ def train():
     params['emb_mat'] = np.array([idx2vec_dict[idx] if idx in idx2vec_dict else np.random.multivariate_normal(
         np.zeros(params['word_emb_size']), np.eye(params['word_emb_size'])) for idx in range(params['word_vocab_size'])],
                               dtype="float32")
-
-    print(params['word_emb_size'])
-    print(params['word_vocab_size'])
-
     device = torch.device(f"cuda:{params.gpu}" if torch.cuda.is_available() else "cpu")
     update_params([train_data, val_data])
     model = BiDAF().to(device)
@@ -128,18 +122,53 @@ def train():
 
     num_steps = int(math.ceil(train_data.num_examples/float(params['batch_size']))) * params['num_epochs']
 
+    count = 0
+
+    train_pred_answers = {}
+    train_actual_answers = {}
+
     for batch in tqdm(train_data.get_batches(params['batch_size'], num_steps=num_steps), total=num_steps):
         batchIdx, batchDs = batch
-        out_c, out_w = model(batchDs)
-        print(out_c.size())
-        print(out_w.size())
-        break
-        # show each data point
-        #print("keys:%s" % batchDs.data.keys())
-        #print(batchDs.data['q'])
-        #print(batchDs.data['y'])
-        #for key in sorted(batchDs.data.()):
-        #    print("\t%s:%s" % (key, batchDs.data[key]))
+        predicted, actual = model(batchDs)
+
+        optimizer.zero_grad()
+        batch_loss = criterion(predicted, actual)
+        loss += batch_loss.item()
+        batch_loss.backward()
+        optimizer.step()
+
+        pred_answers, actual_answers = getAnswers(predicted, batch)
+        train_actual_answers.update(actual_answers)
+        train_pred_answers.update(pred_answers)
+
+        count += 1
+        if (count + 1) % 100 == 0:
+            print(loss)
+            train_eval_score = get_eval_score(train_pred_answers, train_actual_answers)
+            print('Train Accuracy', train_eval_score)
+            with torch.no_grad():
+                model.eval()
+                val_pred_answes = {}
+                val_actual_answers = {}
+                val_num_steps = int(math.ceil(train_data.num_examples/float(params['batch_size'])))
+                for val_batch in tqdm(val_data.get_batches(params['batch_size'], num_steps=val_num_steps), total=val_num_steps):
+                    val_batchIdx, val_batchDs = val_batch
+                    val_predicted, val_actual = model(val_batchDs)
+                    batch_loss = criterion(val_predicted, val_actual)
+                    pred_answers_val, actual_answers_val = getAnswers(predicted, batch)
+                    val_actual_answers.update(actual_answers_val)
+                    val_pred_answes.update(pred_answers_val)
+                val_eval_score = get_eval_score(val_pred_answes, val_actual_answers)
+                print('Validation Accuracy', val_eval_score)
+            model.train()
+
+
+def test(val_data, num_steps):
+    device = torch.device(f"cuda:{params.gpu}" if torch.cuda.is_available() else "cpu")
+    model_test = BiDAF().to(device)
+    model_test.eval()
+    for batch in tqdm(val_data.get_batches(params['batch_size'], num_steps=num_steps), total=num_steps):
+        pass
 
 
 if __name__ == '__main__':
