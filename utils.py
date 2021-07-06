@@ -425,8 +425,6 @@ def populate_tensors(self, batch):
     PT_c = batch.data['photo_titles_c']
     PI = batch.data['photo_idxs']
 
-    print('Inside Populate', PI)
-
     if params['is_train']:
         Y = batch.data['y']
         Y_c = batch.data['cy']
@@ -453,7 +451,6 @@ def populate_tensors(self, batch):
                     break
                 # print pijk
                 assert isinstance(pijk, int)
-                print('Val', i, j, k, '-', pijk)
                 self.pis[i, j, k] = pijk
                 self.pis_mask[i, j, k] = True
 
@@ -668,3 +665,19 @@ def get_eval_score(pred, gt):
         if pred[qid] == gt[qid]:
             correct += 1
     return correct / float(total)
+
+
+def getAnswers(yp, batch):
+    id2predanswers = {}
+    id2realanswers = {}
+    # print yp.shape
+    for qid, yidxi, ypi in zip(batch[1].data['qid'], batch[1].data['yidx'], yp):
+        #print('qid', qid)
+        #print('yidxi', yidxi)
+        #print('ypi', ypi)
+        id2predanswers[qid] = np.argmax(ypi.detach().numpy())
+        id2realanswers[qid] = yidxi  # available answers
+        assert yidxi < 4
+        assert np.argmax(ypi.detach().numpy()) < 4
+    # print q,id2answers[qid
+    return id2predanswers, id2realanswers
