@@ -1,5 +1,4 @@
 import sys, os, argparse
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # so here won't have poll allocator info
 import _pickle as pickle
 import numpy as np
@@ -11,6 +10,8 @@ from config import *
 from utils import Dataset, update_params
 from models.BiDAF import BiDAF, EMA
 from utils import get_eval_score, getAnswers
+
+os.environ['MEMEX_DATA'] = '/home/SharedFolder/MemexQA'
 
 
 def mkdir(path):
@@ -40,8 +41,12 @@ get_model = None  # the model we will use, based on parameter in the get_args()
 
 
 def read_data(datatype, loadExistModelShared=False):
-    data_path = os.path.join(paths['out_path'], "%s_data.p" % datatype)
-    shared_path = os.path.join(paths['out_path'], "%s_shared.p" % datatype)
+    print(os.environ['MEMEX_DATA'])
+
+    data_path = os.path.join(os.environ['MEMEX_DATA'], 'preprocessed', "%s_data.p" % datatype)
+    shared_path = os.path.join(os.environ['MEMEX_DATA'], 'preprocessed', "%s_shared.p" % datatype)
+    #data_path = os.path.join(paths['out_path'], "%s_data.p" % datatype)
+    #shared_path = os.path.join(paths['out_path'], "%s_shared.p" % datatype)
 
     with open(data_path, "rb")as f:
         data = pickle.load(f, encoding='latin1')
@@ -53,7 +58,9 @@ def read_data(datatype, loadExistModelShared=False):
     valid_idxs = range(num_examples)
     print("loaded %s/%s data points for %s" % (len(valid_idxs), num_examples, datatype))
 
-    model_shared_path = os.path.join(paths['shared_path'], "shared.p")
+    #model_shared_path = os.path.join(paths['shared_path'], "shared.p")
+    model_shared_path = os.path.join(os.environ['MEMEX_DATA'], 'preprocessed', "shared.p")
+
     if loadExistModelShared:
         with open(model_shared_path, "rb") as f:
             model_shared = pickle.load(f)
@@ -160,6 +167,7 @@ def train():
                     val_pred_answes.update(pred_answers_val)
                 val_eval_score = get_eval_score(val_pred_answes, val_actual_answers)
                 print('Validation Accuracy', val_eval_score)
+
             model.train()
 
 
