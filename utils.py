@@ -352,59 +352,59 @@ def populate_tensors(self, batch):
     # album title
     # [N,M,JXA]
     self.at = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']),
-                          dtype=torch.int32)
+                          dtype=torch.int32, device="cuda")
     self.at_c = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size'], self.W),
-                            dtype=torch.int32)
+                            dtype=torch.int32, device="cuda")
     self.at_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_album_title_size']),
-                               dtype=torch.bool)
+                               dtype=torch.bool, device="cuda")
 
     # album description
     # [N,M,JD]
-    self.ad = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.int32)
+    self.ad = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.int32, device="cuda")
     self.ad_c = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size'], self.W),
-                            dtype=torch.int32)
-    self.ad_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.bool)
+                            dtype=torch.int32, device="cuda")
+    self.ad_mask = torch.zeros((self.N, params['max_num_albums'], params['max_sent_des_size']), dtype=torch.bool, device="cuda")
 
     # album when, where
     # [N,M,JT/JG]
-    self.when = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.int32)
+    self.when = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.int32, device="cuda")
     self.when_c = torch.zeros((self.N, params['max_num_albums'], params['max_when_size'], self.W),
-                              dtype=torch.int32)
-    self.when_mask = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.bool)
+                              dtype=torch.int32, device="cuda")
+    self.when_mask = torch.zeros((self.N, params['max_num_albums'], params['max_when_size']), dtype=torch.bool, device="cuda")
 
-    self.where = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.int32)
+    self.where = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.int32, device="cuda")
     self.where_c = torch.zeros((self.N, params['max_num_albums'], params['max_where_size'], self.W),
-                               dtype=torch.int32)
-    self.where_mask = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.bool)
+                               dtype=torch.int32, device="cuda")
+    self.where_mask = torch.zeros((self.N, params['max_num_albums'], params['max_where_size']), dtype=torch.bool, device="cuda")
 
     # photo titles
     # [N,M,JI,JXP]
     self.pts = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
-                            params['max_sent_photo_title_size']), dtype=torch.int32)
+                            params['max_sent_photo_title_size']), dtype=torch.int32, device="cuda")
     self.pts_c = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
-                              params['max_sent_photo_title_size'], self.W), dtype=torch.int32)
+                              params['max_sent_photo_title_size'], self.W), dtype=torch.int32, device="cuda")
     self.pts_mask = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos'],
-                                 params['max_sent_photo_title_size']), dtype=torch.bool)
+                                 params['max_sent_photo_title_size']), dtype=torch.bool, device="cuda")
 
     # photo
     # [N,M,JI] # each is a photo index
-    self.pis = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.int32)
-    self.pis_mask = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.bool)
+    self.pis = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.int32, device="cuda")
+    self.pis_mask = torch.zeros((self.N, params['max_num_albums'], params['max_num_photos']), dtype=torch.bool, device="cuda")
 
     # question
     # [N,JQ]
-    self.q = torch.zeros((self.N, params['max_question_size']), dtype=torch.int32)
-    self.q_c = torch.zeros((self.N, params['max_question_size'], self.W), dtype=torch.int32)
-    self.q_mask = torch.zeros((self.N, params['max_question_size']), dtype=torch.bool)
+    self.q = torch.zeros((self.N, params['max_question_size']), dtype=torch.int32, device="cuda")
+    self.q_c = torch.zeros((self.N, params['max_question_size'], self.W), dtype=torch.int32, device="cuda")
+    self.q_mask = torch.zeros((self.N, params['max_question_size']), dtype=torch.bool, device="cuda")
 
     # answer + choice words
     # [N,4,JA]
-    self.choices = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.int32)
-    self.choices_c = torch.zeros((self.N, self.num_choice, params['max_answer_size'], self.W), dtype=torch.int32)
-    self.choices_mask = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.bool)
+    self.choices = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.int32, device="cuda")
+    self.choices_c = torch.zeros((self.N, self.num_choice, params['max_answer_size'], self.W), dtype=torch.int32, device="cuda")
+    self.choices_mask = torch.zeros((self.N, self.num_choice, params['max_answer_size']), dtype=torch.bool, device="cuda")
 
     # 4 choice classification
-    self.y = torch.zeros((self.N, self.num_choice), dtype=torch.bool)
+    self.y = torch.zeros((self.N, self.num_choice), dtype=torch.bool, device="cuda")
 
     # question and choices
     Q = batch.data['q']
@@ -675,9 +675,9 @@ def getAnswers(yp, batch):
         #print('qid', qid)
         #print('yidxi', yidxi)
         #print('ypi', ypi)
-        id2predanswers[qid] = np.argmax(ypi.detach().numpy())
+        id2predanswers[qid] = np.argmax(ypi.cpu().detach().numpy())
         id2realanswers[qid] = yidxi  # available answers
         assert yidxi < 4
-        assert np.argmax(ypi.detach().numpy()) < 4
+        assert np.argmax(ypi.cpu().detach().numpy()) < 4
     # print q,id2answers[qid
     return id2predanswers, id2realanswers
