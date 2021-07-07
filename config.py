@@ -5,10 +5,10 @@ params = {
 
     # Hyper Params
     'gpu': 'gpu0',
-    'learning_rate': 0.01,
+    'learning_rate': 0.001,
     'exp_decay_rate': 0.999,
-    'dropout': 0.2,
-    'num_epochs': 2,
+    'dropout': 0.0,
+    'num_epochs': 100,
     'hidden_size': 100,
     'batch_size': 6,
 
