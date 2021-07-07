@@ -107,7 +107,7 @@ class BiDAF(nn.Module):
 
         self.output_layer = torch.nn.Sequential(
             torch.nn.Linear(params['hidden_size'] * 70, 1),
-            torch.nn.ReLU()
+            torch.nn.LeakyReLU(0.1)
         )
 
     def forward(self, batch):
@@ -242,7 +242,7 @@ class BiDAF(nn.Module):
         h_choices = h_choices.reshape(self.N * 4, params['max_answer_size'], -1)
 
         # Image Features
-        image_feat = nn.Embedding(self.image_emb_mat.shape[0], self.image_emb_mat.shape[1])
+        image_feat = nn.Embedding(self.image_emb_mat.shape[0], self.image_emb_mat.shape[1], device="cuda")
         image_feat.weight.data.copy_(torch.from_numpy(self.image_emb_mat))
 
         image2feat = image_feat(self.pis)
@@ -333,12 +333,19 @@ class BiDAF(nn.Module):
         final_out = torch.tile(torch.unsqueeze(final_out, 1), [1, self.num_choice, 1])
         q_attn = torch.tile(torch.unsqueeze(q_attn, 1), [1, self.num_choice, 1])
 
-        x = torch.cat([q_attn, choice_attn, (final_out * choice_attn), (q_attn * choice_attn),
+        xf = torch.cat([q_attn, choice_attn, (final_out * choice_attn), (q_attn * choice_attn),
                        (final_out - choice_attn) * (final_out - choice_attn)],
                       dim=2)
-        logits = self.output_layer(x)
+        logits = self.output_layer(xf)
         logits = torch.squeeze(logits)
         pred = F.softmax(logits, dim=1)
-        actual = torch.tensor(self.y, dtype=float)
+        #actual = torch.tensor(self.y, dtype=float)
+        actual = self.y.clone().detach()
         actual = torch.max(actual, 1)[1]
-        return pred, actual
+        index = torch.tensor(batch.data['yidx'], device="cuda")
+        #print(logits)
+        #print('Actual', actual)
+        #print('Predicted', pred)
+        #print('Index', batch.data['yidx'])
+        #print('Index Tensor', index)
+        return pred, index
